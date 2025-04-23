@@ -89,8 +89,12 @@ class SPTNetWithText(nn.Module):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.concat_projector = nn.Linear(512 + 768, 768)
         self.projector = nn.Linear(in_features=512, out_features=num_words*word_dim).to(device)
-        self.model1, _ = extend_clip_vit.load_extend_CLIP("ViT-B/16", torch.device(device), n_ctx=self.num_words+2)
-        self.model2, _ = extend_clip_vit.load_extend_CLIP("ViT-B/16", torch.device(device), n_ctx=77)
+                     load_extend_CLIP(
+    "/path/to/ViT-B-16.pt",  # Use local path instead of "ViT-B/16"
+    device="cuda"
+)
+        self.model1, _ = extend_clip_vit.load_extend_CLIP("./backbone/ViT-B-16.pt", torch.device(device), n_ctx=self.num_words+2)
+        self.model2, _ = extend_clip_vit.load_extend_CLIP("./backbone/ViT-B-16.pt", torch.device(device), n_ctx=77)
 
         for params in self.model2.parameters():
             params.requires_grad = False
