@@ -21,8 +21,8 @@ cytoolz
 dask
 easydict==1.9
 einops
-faiss==1.7.4
-faiss-gpu==1.6.5
+#faiss==1.7.4
+#faiss-gpu==1.6.5
 filelock
 fonttools==4.25.0
 frozenlist
