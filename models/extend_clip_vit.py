@@ -734,7 +734,7 @@ def _transform(n_px):
 
 def load_extend_CLIP(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit=False, n_ctx: int = None, use_proj: bool = True):
     if name in _MODELS:
-        model_path = _download(_MODELS[name], download_root or os.path.expanduser("~/.cache/clip"))
+        model_path = _download(_MODELS[name], os.path.expanduser("~/.cache/clip"))
     elif os.path.isfile(name):
         model_path = name
     else:
