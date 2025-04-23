@@ -1,7 +1,7 @@
 # -----------------
 # DATASET ROOTS
 # -----------------
-cifar_10_root = '/disk/datasets'
+cifar_10_root = '/datasets/cifar10'
 cifar_100_root = '/disk/datasets'
 herbarium_dataroot = '/disk/datasets/herbarium_19'
 imagenet_root = '/disk/datasets/ILSVRC12'
