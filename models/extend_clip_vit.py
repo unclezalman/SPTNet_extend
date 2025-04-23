@@ -734,9 +734,11 @@ def _transform(n_px):
 
 def load_extend_CLIP(name: str, device: Union[str, torch.device] = "cuda" if torch.cuda.is_available() else "cpu", jit=False, n_ctx: int = None, use_proj: bool = True):
     if name in _MODELS:
-        model_path = _download(_MODELS[name], os.path.expanduser("~/.cache/clip"))
-    else:
+        model_path = _download(_MODELS[name], download_root or os.path.expanduser("~/.cache/clip"))
+    elif os.path.isfile(name):
         model_path = name
+    else:
+        raise RuntimeError(f"Model {name} not found; available models = {available_models()}")
 
     with open(model_path, 'rb') as opened_file:
         try:
@@ -750,7 +752,6 @@ def load_extend_CLIP(name: str, device: Union[str, torch.device] = "cuda" if tor
             state_dict = torch.load(opened_file, map_location="cpu")
 
     if not jit:
-        # model = build_model(state_dict or model.state_dict()).to(device)
         model = build_extend_model(state_dict or model.state_dict(), n_ctx=n_ctx, use_proj=use_proj).to(device)
         if str(device) == "cpu":
             model.float()
