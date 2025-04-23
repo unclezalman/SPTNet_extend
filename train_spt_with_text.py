@@ -27,7 +27,6 @@ from model import DINOHead, info_nce_logits, SupConLoss, DistillLoss, Contrastiv
 
 from config import clip_pretrain_path, dino_pretrain_path
 from models import extend_clip_vit
-import clip
 
 parser = argparse.ArgumentParser(description='SPTNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch_size', default=128, type=int)
@@ -69,7 +68,6 @@ parser.add_argument('--eval_freq', default=1, type=int)
 parser.add_argument('--num_words', default=7, type=int)
 parser.add_argument('--words_drop_ratio', default=0.2, type=float)
 parser.add_argument('--word_dim', default=512, type=int)   
-parser.add_argument('--lamC', default=1.0, type=float, help='Weight for CICO loss')
 parser.add_argument('--t_model_path', type=str, default=None, help='Path to pretrained text model')
 
 # ----------------------
