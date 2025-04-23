@@ -423,8 +423,7 @@ if __name__ == "__main__":
     
         if epoch % args.eval_freq == 0:
             with torch.no_grad():
-                all_acc_img, old_acc_img, new_acc_img, all_acc_text, old_acc_text, new_acc_text, \
-                all_acc_mix, old_acc_mix, new_acc_mix = test(model, model_t, ln_t, test_loader_labelled, 
+                all_acc, old_acc, new_acc = test(model, model_t, ln_t, test_loader_labelled, 
                                                            epoch, 'Train ACC Unlabelled', args)
                 
                 torch.save({
