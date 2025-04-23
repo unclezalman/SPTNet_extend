@@ -340,23 +340,15 @@ if __name__ == "__main__":
     # ----------------------
     # OPTIMIZATION
     # ----------------------
-     params = [
-        {'params': [p for param_group in get_params_groups(prompter) 
-                   for p in param_group['params']], 
-         'lr': args.lr},
-        {'params': [p for p in ln_t.parameters() if p.requires_grad], 
-         'lr': args.lr}
-    ]
+    params = [
+         {'params': [p for param_group in get_params_groups(prompter) 
+                   for p in param_group['params']], 'lr': args.lr},
+         {'params': [p for p in ln_t.parameters() if p.requires_grad], 'lr': args.lr}
+     ]
         
     # Initialize optimizers
     optimizer = SGD(params, lr=args.lr, momentum=args.momentum, weight_decay=0)
-    optimizer_cls = SGD(
-        [p for param_group in get_params_groups(classifier)
-         for p in param_group['params']],
-        lr=args.lr2,
-        momentum=args.momentum,
-        weight_decay=args.weight_decay
-    )
+    optimizer_cls = SGD([p for param_group in get_params_groups(classifier) for p in param_group['params']], lr=args.lr2, momentum=args.momentum, weight_decay=args.weight_decay)
         
     args.fp16_scaler = None
     if args.fp16:
