@@ -396,6 +396,34 @@ class CLIP(nn.Module):
         # shape = [global_batch_size, global_batch_size]
         return logits_per_image, logits_per_text
 
+class TextPromptCLIP(nn.Module):
+    def __init__(self, clip_model):
+        super().__init__()
+        self.clip = clip_model
+        self.fusion_proj = nn.Linear(clip_model.text_projection.shape[1] * 2, 
+                                   clip_model.text_projection.shape[1])
+        
+    def encode_image(self, image):
+        return self.clip.encode_image(image)
+    
+    def encode_text(self, text):
+        return self.clip.encode_text(text)
+    
+    def forward(self, image, text_prompts):
+        # Encode image
+        image_features = self.encode_image(image)
+        
+        # Encode multiple text prompts and average them
+        text_features = []
+        for prompt in text_prompts:
+            text_features.append(self.encode_text(prompt))
+        text_features = torch.stack(text_features).mean(dim=0)
+        
+        # Concatenate features
+        fused_features = torch.cat([image_features, text_features], dim=-1)
+        fused_features = self.fusion_proj(fused_features)
+        
+        return fused_features
 
 def convert_weights(model: nn.Module):
     """Convert applicable model parameters to fp16"""
@@ -434,7 +462,8 @@ def load_clip(model_path, device="cuda" if torch.cuda.is_available() else "cpu",
             state_dict = torch.load(opened_file, map_location="cpu")
 
     if not jit:
-        model = build_model(state_dict or model.state_dict()).to(device)
+        base_model = build_model(state_dict or model.state_dict()).to(device)
+        model = TextPromptCLIP(base_model)
         if str(device) == "cpu":
             model.float()
         return model
