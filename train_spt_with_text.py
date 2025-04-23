@@ -217,7 +217,7 @@ def train(prompter, backbone, projector, model_t, ln_t, train_loader, optimizer,
             with torch.cuda.amp.autocast(args.fp16_scaler is not None):
                 images = torch.cat([images[0].cuda(non_blocking=True), 
                                   prompter(images[0].cuda(non_blocking=True)).detach()], dim=0)
-                loss, feats, outs, text_feats = construct_gcd_loss(None, backbone, projector, model_t, ln_t, 
+                loss, feats, outs = construct_gcd_loss(None, backbone, projector, model_t, ln_t, 
                                                      images, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer_cls.zero_grad()
