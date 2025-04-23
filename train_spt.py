@@ -21,7 +21,7 @@ from util.cluster_and_log_utils import log_accs_from_preds
 from model import DINOHead, info_nce_logits, SupConLoss, DistillLoss, ContrastiveLearningViewGenerator
 
 from config import clip_pretrain_path, dino_pretrain_path
-
+from models import clip_vit
 
 parser = argparse.ArgumentParser(description='SPTNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch_size', default=128, type=int)
@@ -69,14 +69,9 @@ device = torch.device('cuda')
 args = get_class_splits(args)
 
 
-def construct_gcd_loss(prompter, backbone, projector, images, class_labels, mask_lab, cluster_criterion, epoch, args):
-    if prompter is None:
-        feats = backbone(images)
-        student_proj, student_out = projector(feats)
-    else:
-        feats = backbone(prompter(images))
-        student_proj, student_out = projector(feats)
-
+def construct_gcd_loss(prompter, backbone, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args):
+    fused_features = backbone(images, text_prompts)
+    student_proj, student_out = projector(fused_features)
     teacher_out = student_out.detach()
 
     # clustering, sup
@@ -104,7 +99,7 @@ def construct_gcd_loss(prompter, backbone, projector, images, class_labels, mask
     loss += (1 - args.sup_weight) * cluster_loss + args.sup_weight * cls_loss
     loss += (1 - args.sup_weight) * contrastive_loss + args.sup_weight * sup_con_loss
 
-    return loss, feats, student_out
+    return loss, fused_features, student_out
 
 
 def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls, exp_lr_scheduler, exp_lr_scheduler_cls, cluster_criterion, epoch, args):
@@ -124,7 +119,7 @@ def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls,
         step = num_batches_per_epoch * epoch + batch_idx
         exp_lr_scheduler(step)
 
-        images, class_labels, uq_idxs, mask_lab = batch
+        images, class_labels, text_prompts, uq_idxs, mask_lab = batch
         mask_lab = mask_lab[:, 0]
 
         class_labels, mask_lab = class_labels.cuda(non_blocking=True), mask_lab.cuda(non_blocking=True).bool()
@@ -136,7 +131,7 @@ def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls,
 
             with torch.cuda.amp.autocast(args.fp16_scaler is not None):
                 images = torch.cat([images[0].cuda(non_blocking=True), prompter(images[0].cuda(non_blocking=True)).detach()], dim=0)
-                loss, feats, outs = construct_gcd_loss(None, backbone, projector, images, class_labels, mask_lab, cluster_criterion, epoch, args)
+                loss, feats, outs = construct_gcd_loss(None, backbone, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer_cls.zero_grad()
 
@@ -156,7 +151,7 @@ def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls,
 
             with torch.cuda.amp.autocast(args.fp16_scaler is not None):
                 images = torch.cat(images, dim=0).cuda(non_blocking=True)
-                loss, feats, outs = construct_gcd_loss(prompter, backbone, projector, images, class_labels, mask_lab, cluster_criterion, epoch, args)
+                loss, feats, outs = construct_gcd_loss(prompter, backbone, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer.zero_grad()
 
@@ -218,7 +213,8 @@ if __name__ == "__main__":
     # ----------------------
     # BASE MODEL
     # ----------------------
-    backbone = vits.__dict__['vit_base']().to(device)
+    backbone = clip_vit.load_clip(args.clip_pretrain_path).to_device
+    freeze(backbone.clip)
     args.patch_size = 16
         
     if args.prompt_type == 'patch':
