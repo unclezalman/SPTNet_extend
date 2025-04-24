@@ -164,25 +164,37 @@ def unfreeze(backbone):
     for m in backbone.parameters():
         m.requires_grad = True
     return backbone
-    
+
 
 def finetune_params(backbone, args):
-    for m in backbone.parameters():
-        m.requires_grad = False
-
-    # Only finetune layers from block 'args.grad_from_block' onwards
-    for name, m in backbone.named_parameters():
-        if args.model == 'dino':
-            if 'block' in name:
+    """Select which parameters to finetune based on layer depth"""
+    for name, param in backbone.named_parameters():
+        param.requires_grad = False  # Freeze all layers initially
+        
+        # Handle DINO models
+        if args.model == 'dino' and 'blocks' in name:
+            try:
                 block_num = int(name.split('.')[1])
                 if block_num >= args.grad_from_block:
-                    m.requires_grad = True
-                    
+                    param.requires_grad = True
+            except (IndexError, ValueError):
+                continue
+                
+        # Handle CLIP models
         elif args.model == 'clip':
-            if 'transformer.resblocks' in name:
-                block_num = int(name.split('.')[2])
-                if block_num >= args.grad_from_block:
-                    m.requires_grad = True
+            # CLIP visual transformer layers
+            if 'visual.transformer.resblocks' in name:
+                parts = name.split('.')
+                try:
+                    block_idx = parts.index('resblocks')
+                    block_num = int(parts[block_idx + 1])
+                    if block_num >= args.grad_from_block:
+                        param.requires_grad = True
+                except (IndexError, ValueError):
+                    continue
+            # CLIP projection layers
+            elif any(x in name for x in ['proj', 'head', 'last_layer']):
+                param.requires_grad = True
 
     return backbone
 
