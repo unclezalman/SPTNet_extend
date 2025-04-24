@@ -35,20 +35,14 @@ get_dataset_funcs = {
 
 def get_datasets(dataset_name, train_transform, test_transform, args):
 
-    """
-    :return: train_dataset: MergedDataset which concatenates labelled and unlabelled
-             test_dataset,
-             unlabelled_train_examples_test,
-             datasets
-    """
-
     #
     if dataset_name not in get_dataset_funcs.keys():
         raise ValueError
 
     # Get datasets
     get_dataset_f = get_dataset_funcs[dataset_name]
-    datasets = get_dataset_f(train_transform=train_transform, test_transform=test_transform,
+    datasets = get_dataset_f(train_transform=train_transform, 
+                             test_transform=test_transform,
                             train_classes=args.train_classes,
                             prop_train_labels=args.prop_train_labels,
                             split_train_val=False)
