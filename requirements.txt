@@ -93,8 +93,8 @@ toml
 toolz
 torch==2.0.0
 torchaudio==0.15.1
-torchvision==
-torchxrayvision==2.0.1
+torchvision==2.0.1
+torchxrayvision==1.2.1
 tornado
 tqdm
 typing_extensions
