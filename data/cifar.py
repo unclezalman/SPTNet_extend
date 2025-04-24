@@ -1,3 +1,4 @@
+import torch
 from torchvision.datasets import CIFAR10, CIFAR100
 from copy import deepcopy
 import numpy as np
@@ -6,35 +7,71 @@ import clip
 from data.data_utils import subsample_instances
 from config import cifar_10_root, cifar_100_root
 
-class CustomCIFAR10(CIFAR10):
+class CustomCIFARBase:
     def __init__(self, *args, **kwargs):
-        super(CustomCIFAR10, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.uq_idxs = np.array(range(len(self)))
+        self._preprocess_text_prompts()
+        
+    def _preprocess_text_prompts(self):
+        """Pre-tokenize and cache text prompts for all classes"""
+        self.text_templates = [
+            "a photo of a {}",
+            "a cropped photo of a {}", 
+            "a good photo of a {}",
+            "a bad photo of a {}",
+            "a photo of one {}",
+            "a photo of many {}",
+            "a {} in natural scene",
+            "a {} on white background",
+            "a hard to see photo of a {}",
+            "a low resolution photo of a {}"
+        ]
+        
+        # Pre-tokenize all class prompts
+        self.tokenized_prompts = {}
+        for class_idx, class_name in enumerate(self.class_names):
+            prompts = [template.format(class_name) for template in self.text_templates]
+            tokenized = torch.stack([clip.tokenize(p) for p in prompts])
+            self.tokenized_prompts[class_idx] = tokenized
+
+    def __getitem__(self, item):
+        img, label = super().__getitem__(item)
+        text_inputs = self.tokenized_prompts[label]
+        uq_idx = self.uq_idxs[item]
+        return img, label, text_inputs, uq_idx
+
+    def __len__(self):
+        return len(self.targets)
+
+class CustomCIFAR10(CustomCIFARBase, CIFAR10):
+    def __init__(self, *args, **kwargs):
         self.class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
-                           'dog', 'frog', 'horse', 'ship', 'truck']
-
-    def __getitem__(self, item):
-        img, label = super().__getitem__(item)
-        uq_idx = self.uq_idxs[item]
-        return img, label, uq_idx
-
-    def __len__(self):
-        return len(self.targets)
+                          'dog', 'frog', 'horse', 'ship', 'truck']
+        super().__init__(*args, **kwargs)
 
 
-class CustomCIFAR100(CIFAR100):
+class CustomCIFAR100(CustomCIFARBase, CIFAR100):
     def __init__(self, *args, **kwargs):
-        super(CustomCIFAR100, self).__init__(*args, **kwargs)
-        self.uq_idxs = np.array(range(len(self)))
-        self.class_names = [f'class_{i}' for i in range(100)]
-
-    def __getitem__(self, item):
-        img, label = super().__getitem__(item)
-        uq_idx = self.uq_idxs[item]
-        return img, label, uq_idx
-
-    def __len__(self):
-        return len(self.targets)
+        # Use fine-grained CIFAR-100 class names
+        self.class_names = [
+            'apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle', 
+            'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 
+            'can', 'castle', 'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 
+            'cloud', 'cockroach', 'couch', 'crab', 'crocodile', 'cup', 'dinosaur', 
+            'dolphin', 'elephant', 'flatfish', 'forest', 'fox', 'girl', 'hamster', 
+            'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
+            'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse',
+            'mushroom', 'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear',
+            'pickup_truck', 'pine_tree', 'plain', 'plate', 'poppy', 'porcupine',
+            'possum', 'rabbit', 'raccoon', 'ray', 'road', 'rocket', 'rose',
+            'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake',
+            'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table',
+            'tank', 'telephone', 'television', 'tiger', 'tractor', 'train', 'trout',
+            'tulip', 'turtle', 'wardrobe', 'whale', 'willow_tree', 'wolf', 'woman',
+            'worm'
+        ]
+        super().__init__(*args, **kwargs)
 
 
 class TextPromptCIFAR(CIFAR100):
@@ -141,11 +178,16 @@ def get_cifar_100_datasets(train_transform, test_transform, train_classes=range(
     np.random.seed(seed)
 
     # Init entire training set
-    whole_training_set = CustomCIFAR100(root=cifar_100_root, transform=train_transform, train=True, download=True)
+    whole_training_set = CustomCIFAR100(root=cifar_100_root, 
+                                      transform=train_transform, 
+                                      train=True, 
+                                      download=True)
 
     # Get labelled training set
-    train_dataset_labelled = subsample_classes(deepcopy(whole_training_set), include_classes=train_classes)
-    subsample_indices = subsample_instances(train_dataset_labelled, prop_indices_to_subsample=prop_train_labels)
+    train_dataset_labelled = subsample_classes(deepcopy(whole_training_set), 
+                                          include_classes=train_classes)
+    subsample_indices = subsample_instances(train_dataset_labelled, 
+                                         prop_indices_to_subsample=prop_train_labels)
     train_dataset_labelled = subsample_dataset(train_dataset_labelled, subsample_indices)
 
     # Split into training and validation sets
@@ -156,21 +198,19 @@ def get_cifar_100_datasets(train_transform, test_transform, train_classes=range(
 
     # Get unlabelled data
     unlabelled_indices = set(whole_training_set.uq_idxs) - set(train_dataset_labelled.uq_idxs)
-    train_dataset_unlabelled = subsample_dataset(deepcopy(whole_training_set), np.array(list(unlabelled_indices)))
+    train_dataset_unlabelled = subsample_dataset(deepcopy(whole_training_set), 
+                                              np.array(list(unlabelled_indices)))
 
     # Get test set for all classes
-    test_dataset = CustomCIFAR100(root=cifar_100_root, transform=test_transform, train=False, download=True)
-
-    # Wrap datasets with TextPromptCIFAR
-    train_dataset_labelled = TextPromptCIFAR(train_dataset_labelled_split if split_train_val else train_dataset_labelled)
-    train_dataset_unlabelled = TextPromptCIFAR(train_dataset_unlabelled)
-    val_dataset_labelled = TextPromptCIFAR(val_dataset_labelled_split) if split_train_val else None
-    test_dataset = TextPromptCIFAR(test_dataset)
+    test_dataset = CustomCIFAR100(root=cifar_100_root, 
+                                transform=test_transform, 
+                                train=False, 
+                                download=True)
 
     all_datasets = {
-        'train_labelled': train_dataset_labelled,
+        'train_labelled': train_dataset_labelled_split if split_train_val else train_dataset_labelled,
         'train_unlabelled': train_dataset_unlabelled,
-        'val': val_dataset_labelled,
+        'val': val_dataset_labelled_split if split_train_val else None,
         'test': test_dataset,
     }
 
