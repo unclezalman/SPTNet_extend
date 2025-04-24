@@ -285,9 +285,9 @@ if __name__ == "__main__":
                                 out_dim=args.proj_dim, num_mlp_layers=args.num_mlp_layers).to(device)
     #projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
     
-    #classifier = nn.Sequential(backbone, projector).cuda()
-    #state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
-    #classifier.load_state_dict(state_dict)
+    classifier = nn.Sequential(backbone, projector).cuda()
+    state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
+    classifier.load_state_dict(state_dict)
     model = nn.Sequential(prompter, backbone,projector).to(device)
     model.load_state_dict(state_dict)
 
