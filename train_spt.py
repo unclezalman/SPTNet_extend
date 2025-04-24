@@ -23,7 +23,7 @@ from model import DINOHead, info_nce_logits, SupConLoss, DistillLoss, Contrastiv
 from config import clip_pretrain_path, dino_pretrain_path
 from models import clip_vit
 from models.text_encoder import TextEncoder
-from datasets import cifar
+from data import cifar
 
 parser = argparse.ArgumentParser(description='SPTNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch_size', default=128, type=int)
