@@ -331,7 +331,7 @@ if __name__ == "__main__":
     train_transform = ContrastiveLearningViewGenerator(base_transform=train_transform, n_views=args.n_views)
     
     # DATASETS
-    train_dataset, test_dataset, unlabelled_train_examples_test, datasets = cifar.get_datasets(train_transform, test_transform, 
+    train_dataset, test_dataset, unlabelled_train_examples_test, datasets = get_datasets(train_transform, test_transform, 
                                                                                                    train_classes=args.train_classes, prop_train_labels = args.prop_train_labels)
 
     # --------------------
