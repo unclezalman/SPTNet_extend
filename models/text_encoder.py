@@ -1,30 +1,43 @@
 import torch
 import clip
+from PIL import Image
 
 class TextEncoder(torch.nn.Module):
     def __init__(self, clip_model_name="ViT-B/16", device="cuda"):
         super().__init__()
         self.device = device
-        self.clip_model, _ = clip.load(clip_model_name, device=device)
-        self.clip_model = self.clip_model.eval()
-        for param in self.clip_model.parameters():
-            param.requires_grad=False
         
+        # Load CLIP model
+        self.clip_model, self.preprocess = clip.load(clip_model_name, device=device)
+        self.clip_model = self.clip_model.eval()
+        
+        # Freeze all parameters
+        for param in self.clip_model.parameters():
+            param.requires_grad = False
+            
     def forward(self, text_inputs):
-        if isinstance(text_inputs, list) or isinstance(text_inputs, str):
+        """
+        Handle different input types:
+        - List of strings: ["a cat", "a dog"]
+        - String: "a photo of a cat"
+        - Pre-tokenized tensor: [batch_size, seq_len] or [batch_size, num_prompts, seq_len]
+        """
+        # Handle raw text input
+        if isinstance(text_inputs, (list, str)):
             text_inputs = clip.tokenize(text_inputs, truncate=True).to(self.device)
-        # text_inputs shape: [batch_size, num_prompts, seq_len]
-        if len(text_inputs.shape) == 3:  # [batch, num_prompts, seq_len]
-            batch_size, num_prompts, seq_len = text_inputs.shape
-            text_inputs = text_inputs.view(-1, seq_len)  # [batch*num_prompts, seq_len]
+            
+        # Handle multiple prompts per sample
+        original_shape = text_inputs.shape
+        if len(original_shape) == 3:
+            batch_size, num_prompts, seq_len = original_shape
+            text_inputs = text_inputs.view(-1, seq_len)
             
         # Get text features
-        with torch.no_grad():  # Ensure no gradients
+        with torch.no_grad():
             text_features = self.clip_model.encode_text(text_inputs)
             
-        # Reshape if we had multiple prompts
-        if len(text_inputs.shape) == 3:
+        # Reshape if needed
+        if len(original_shape) == 3:
             text_features = text_features.view(batch_size, num_prompts, -1)
             
         return text_features
-    
