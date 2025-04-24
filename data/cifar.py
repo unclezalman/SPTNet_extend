@@ -216,11 +216,7 @@ def get_cifar_100_datasets(train_transform, test_transform, train_classes=range(
         'test': test_dataset,
     }
                            
-    return {
-        'train': train_dataset,
-        'val': val_dataset_labelled_split if split_train_val else None,
-        'test': test_dataset,
-        'unlabelled_test': train_dataset_unlabelled  # For evaluation}
+    return {'train': train_dataset,'val': val_dataset_labelled_split if split_train_val else None, 'test': test_dataset, 'unlabelled_test': train_dataset_unlabelled}
 
 
 if __name__ == '__main__':
