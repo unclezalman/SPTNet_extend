@@ -287,9 +287,9 @@ if __name__ == "__main__":
     
     classifier = nn.Sequential(backbone, projector).cuda()
     state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
-    classifier.load_state_dict(state_dict)
+    classifier.load_state_dict(state_dict, strict=False)
     model = nn.Sequential(prompter, backbone,projector).to(device)
-    model.load_state_dict(state_dict)
+    model.load_state_dict(state_dict, strict=False)
 
     # ----------------------
     # OPTIMIZATION
