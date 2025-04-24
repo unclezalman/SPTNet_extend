@@ -206,6 +206,8 @@ def get_cifar_100_datasets(train_transform, test_transform, train_classes=range(
                                 transform=test_transform, 
                                 train=False, 
                                 download=True)
+    train_dataset = MergedDataset(
+        labelled_dataset=train_dataset_labelled_split if split_train_val else train_dataset_labelled, unlabelled_dataset=train_dataset_unlabelled)
 
     all_datasets = {
         'train_labelled': train_dataset_labelled_split if split_train_val else train_dataset_labelled,
@@ -213,8 +215,12 @@ def get_cifar_100_datasets(train_transform, test_transform, train_classes=range(
         'val': val_dataset_labelled_split if split_train_val else None,
         'test': test_dataset,
     }
-
-    return all_datasets
+                           
+    return {
+        'train': train_dataset,
+        'val': val_dataset_labelled_split if split_train_val else None,
+        'test': test_dataset,
+        'unlabelled_test': train_dataset_unlabelled  # For evaluation}
 
 
 if __name__ == '__main__':
