@@ -20,5 +20,5 @@ osr_split_dir = '/disk/work/hjwang/osrd/data/open_set_splits'
 # OTHER PATHS
 # -----------------
 dino_pretrain_path = '/disk/work/hjwang/pretrained_models/dino/dino_vitbase16_pretrain.pth' 
-clip_pretrain_path = '/disk/work/hjwang/pretrained_models/clip/ViT-B-16.pt' 
+clip_pretrain_path = './pretrained_models/clip/ViT-B-16.pt' 
 feature_extract_dir = '/disk/work/hjwang/gcd/extracted_features_public_impl'     # Extract features to this directory
