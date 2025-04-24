@@ -256,7 +256,7 @@ if __name__ == "__main__":
     # ----------------------
     # BASE MODEL
     # ----------------------
-    backbone = clip_vit.load_clip(clip_pretrain_path).to_device
+    backbone = clip_vit.load_clip(clip_pretrain_path).to(device)
     text_encoder = TextEncoder().to(device)
     freeze(backbone.clip)
     freeze(text_encoder)
