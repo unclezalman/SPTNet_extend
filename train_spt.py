@@ -256,6 +256,8 @@ if __name__ == "__main__":
     # ----------------------
     # BASE MODEL
     # ----------------------
+
+    
     backbone = clip_vit.load_clip(clip_pretrain_path).to(device)
     text_encoder = TextEncoder().to(device)
     freeze(backbone.clip)
@@ -285,11 +287,26 @@ if __name__ == "__main__":
                                 out_dim=args.proj_dim, num_mlp_layers=args.num_mlp_layers).to(device)
     #projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
     
+    
     classifier = nn.Sequential(backbone, projector).cuda()
     state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
-    classifier.load_state_dict(state_dict, strict=False)
+    if args.model =='clip':
+        clip_model = torch.jit.load(args.pretrained_model_path, map_location='cpu').eval()
+        visual_state_dict = clip_model.visual.state_dict()
+
+        backbone_state_dict = {k.replace('0.', ''): v 
+                         for k, v in classifier.state_dict().items()
+                         if k.startswith('0.')}
+        matched_visual = {k: v for k, v in visual_state_dict.items() if k in backbone_state_dict}
+        backbone_state_dict.update(matched_visual)
+        backbone.load_state_dict(backbone_state_dict, strict=False)
+
+    else:
+        state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
+        if 'teacher' in state_dict:
+            state_dict = state_dict['teacher']
+        classifier.load_state_dict(state_dict, strict=False)
     model = nn.Sequential(prompter, backbone,projector).to(device)
-    model.load_state_dict(state_dict, strict=False)
 
     # ----------------------
     # OPTIMIZATION
