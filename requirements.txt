@@ -91,10 +91,10 @@ tifffile
 timm
 toml
 toolz
-#torch==1.13.1
-#torchaudio==2.0.1
-#torchvision==0.14.1
-torchxrayvision==1.2.1
+torch==2.0.0
+torchaudio==0.15.1
+torchvision==
+torchxrayvision==2.0.1
 tornado
 tqdm
 typing_extensions
