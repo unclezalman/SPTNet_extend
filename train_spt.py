@@ -22,6 +22,8 @@ from model import DINOHead, info_nce_logits, SupConLoss, DistillLoss, Contrastiv
 
 from config import clip_pretrain_path, dino_pretrain_path
 from models import clip_vit
+from models.text_encoder import TextEncoder
+from datasets import cifar
 
 parser = argparse.ArgumentParser(description='SPTNet', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch_size', default=128, type=int)
@@ -68,10 +70,46 @@ args = parser.parse_args()
 device = torch.device('cuda')
 args = get_class_splits(args)
 
+class FusionProjector(nn.Module):
+    def __init__(self, image_feat_dim, text_feat_dim, out_dim, num_mlp_layers=3):
+        super().__init__()
+        # Project both modalities to same dimension
+        self.image_proj = nn.Linear(image_feat_dim, out_dim)
+        self.text_proj = nn.Linear(text_feat_dim, out_dim)
+        
+        # MLP head
+        layers = []
+        in_dim = out_dim * 2  # Concatenated features
+        for _ in range(num_mlp_layers - 1):
+            layers.append(nn.Linear(in_dim, in_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(in_dim, out_dim))
+        self.mlp = nn.Sequential(*layers)
+        
+    def forward(self, image_feats, text_feats):
+        # Average text features across prompts
+        text_feats = text_feats.mean(dim=1)  # [batch_size, text_feat_dim]
+        
+        # Project both modalities
+        image_proj = self.image_proj(image_feats)
+        text_proj = self.text_proj(text_feats)
+        
+        # Concatenate and pass through MLP
+        fused = torch.cat([image_proj, text_proj], dim=-1)
+        return self.mlp(fused), fused
 
-def construct_gcd_loss(prompter, backbone, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args):
-    fused_features = backbone(images, text_prompts)
-    student_proj, student_out = projector(fused_features)
+
+def construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args):
+    text_prompts = torch.stack(text_prompts, dim=1).to(images.device)
+
+    if prompter is None:
+        image_feats = backbone.encode_image(images)
+    else:
+        image_feats = backbone.encode_image(prompter(images))
+
+    with torch.no_grad():
+        text_feats = text_encoder(text_prompts)
+    student_proj, student_out = projector(image_feats, text_feats)
     teacher_out = student_out.detach()
 
     # clustering, sup
@@ -99,10 +137,10 @@ def construct_gcd_loss(prompter, backbone, projector, images, text_prompts, clas
     loss += (1 - args.sup_weight) * cluster_loss + args.sup_weight * cls_loss
     loss += (1 - args.sup_weight) * contrastive_loss + args.sup_weight * sup_con_loss
 
-    return loss, fused_features, student_out
+    return loss, student_proj, student_out
 
 
-def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls, exp_lr_scheduler, exp_lr_scheduler_cls, cluster_criterion, epoch, args):
+def train(prompter, backbone, text_encoder, projector, train_loader, optimizer, optimizer_cls, exp_lr_scheduler, exp_lr_scheduler_cls, cluster_criterion, epoch, args):
 
     prompter.train()
     backbone.train()
@@ -131,7 +169,7 @@ def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls,
 
             with torch.cuda.amp.autocast(args.fp16_scaler is not None):
                 images = torch.cat([images[0].cuda(non_blocking=True), prompter(images[0].cuda(non_blocking=True)).detach()], dim=0)
-                loss, feats, outs = construct_gcd_loss(None, backbone, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
+                loss, feats, outs = construct_gcd_loss(None, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer_cls.zero_grad()
 
@@ -151,7 +189,7 @@ def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls,
 
             with torch.cuda.amp.autocast(args.fp16_scaler is not None):
                 images = torch.cat(images, dim=0).cuda(non_blocking=True)
-                loss, feats, outs = construct_gcd_loss(prompter, backbone, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
+                loss, feats, outs = construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer.zero_grad()
 
@@ -166,15 +204,20 @@ def train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls,
     exp_lr_scheduler_cls.step()
 
 
-def test(model, test_loader, epoch, save_name, args):
+def test(model, text_encoder, test_loader, epoch, save_name, args):
 
     model.eval()
+    text_encoder.eval()
 
     preds, targets = [], []
     mask = np.array([])
-    for batch_idx, (images, label, _) in enumerate(tqdm(test_loader)):
+
+    for batch_idx, (images, label, text_prompts,  _) in enumerate(tqdm(test_loader)):
         images = images.cuda(non_blocking=True)
+        text_prompts = torch.stack(text_prompts, dim=1).cuda()
+
         with torch.no_grad():
+            text_features = text_encoder(text_prompts)
             _, logits = model(images)
             preds.append(logits.argmax(1).cpu().numpy())
             targets.append(label.cpu().numpy())
@@ -214,7 +257,10 @@ if __name__ == "__main__":
     # BASE MODEL
     # ----------------------
     backbone = clip_vit.load_clip(args.clip_pretrain_path).to_device
+    text_encoder = TextEncoder().to(device)
     freeze(backbone.clip)
+    freeze(text_encoder)
+
     args.patch_size = 16
         
     if args.prompt_type == 'patch':
@@ -235,12 +281,15 @@ if __name__ == "__main__":
     # ----------------------
     # CLS HEAD
     # ----------------------
-    projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
+    projector = FusionProjector(image_feat_dim=args.feat_dim, text_feat_dim=512, 
+                                out_dim=args.proj_dim, num_mlp_layers=args.num_mlp_layers).to(device)
+    #projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
     
-    classifier = nn.Sequential(backbone, projector).cuda()
-    state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
-    classifier.load_state_dict(state_dict)
-    model = nn.Sequential(prompter, classifier).cuda()
+    #classifier = nn.Sequential(backbone, projector).cuda()
+    #state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
+    #classifier.load_state_dict(state_dict)
+    model = nn.Sequential(prompter, backbone,projector).to(device)
+    model.load_state_dict(state_dict)
 
     # ----------------------
     # OPTIMIZATION
@@ -265,7 +314,8 @@ if __name__ == "__main__":
     train_transform = ContrastiveLearningViewGenerator(base_transform=train_transform, n_views=args.n_views)
     
     # DATASETS
-    train_dataset, test_dataset, unlabelled_train_examples_test, datasets = get_datasets(args.dataset_name, train_transform, test_transform, args)
+    train_dataset, test_dataset, unlabelled_train_examples_test, datasets = cifar.get_cifar_100_datasets(train_transform, test_transform, 
+                                                                                                   train_classes=args.train_classes, prop_train_labels = args.prop_train_labels)
 
     # --------------------
     # SAMPLER
@@ -302,10 +352,10 @@ if __name__ == "__main__":
     for epoch in range(args.epochs):
         print("Epoch: " + str(epoch))
 
-        train(prompter, backbone, projector, train_loader, optimizer, optimizer_cls, exp_lr_scheduler, exp_lr_scheduler_cls, cluster_criterion, epoch, args)
+        train(prompter, backbone, text_encoder, projector, train_loader, optimizer, optimizer_cls, exp_lr_scheduler, exp_lr_scheduler_cls, cluster_criterion, epoch, args)
     
         if epoch % args.eval_freq == 0:
             with torch.no_grad():
                 # Testing on labelled examples
-                all_acc, old_acc, new_acc = test(model, test_loader_labelled, epoch=epoch, save_name='Train ACC Unlabelled', args=args)
+                all_acc, old_acc, new_acc = test(model, text_encoder, test_loader_labelled, epoch=epoch, save_name='Train ACC Unlabelled', args=args)
                 torch.save(model.state_dict(), os.path.join(args.model_path, 'dinoB16_best_trainul.pt'))
