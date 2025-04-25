@@ -33,7 +33,7 @@ class CustomCIFARBase:
         self.tokenized_prompts = {}
         for class_idx, class_name in enumerate(self.class_names):
             prompts = [template.format(class_name) for template in self.text_templates]
-            tokenized = torch.stack([clip.tokenize(p) for p in prompts])
+            tokenized = torch.stack([clip.tokenize(p) for p in prompts]).squeeze(1)
             self.tokenized_prompts[class_idx] = tokenized
 
     def __getitem__(self, item):
