@@ -86,10 +86,6 @@ class FusionProjector(nn.Module):
         self.classifier = nn.Linear(out_dim, num_classes)
 
     def forward(self, image_feats, text_feats):
-        image_feats = image_feats.to(self.image_proj.weight.dtype)
-        text_feats = text_feats.to(self.text_proj.weight.dtype)
-
-        text_feats = text_feats.mean(dim=1)
         image_proj = self.image_proj(image_feats)
         text_proj = self.text_proj(text_feats)
         
@@ -121,7 +117,7 @@ class SPTNet(nn.Module):
             text_feats = self.text_encoder(text_prompts_flat)
             text_feats = text_feats.view(batch_size, num_templates, -1)
             text_feats = text_feats.mean(dim=1)
-            
+            print("Final text features shape:", text_feats.shape)
             # Get projections and logits
             proj, logits = self.projector(image_feats, text_feats)
             return proj, logits
