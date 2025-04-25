@@ -268,7 +268,7 @@ if __name__ == "__main__":
     args.interpolation = 3
     args.crop_pct = 0.875
     args.image_size = 224
-    args.feat_dim = 512
+    args.feat_dim = 768
     args.proj_dim = 256
     args.num_mlp_layers = 3
     args.num_labeled_classes = len(args.train_classes)
