@@ -25,16 +25,16 @@ class MergedDataset(Dataset):
     def __getitem__(self, item):
 
         if item < len(self.labelled_dataset):
-            img, label, uq_idx = self.labelled_dataset[item]
+            img, label, text_prompts, uq_idx = self.labelled_dataset[item]
             labeled_or_not = 1
 
         else:
-
-            img, label, uq_idx = self.unlabelled_dataset[item - len(self.labelled_dataset)]
+            idx = item - len(self.labelled_dataset)
+            img, label, text_prompts, uq_idx = self.unlabelled_dataset[idx]
             labeled_or_not = 0
 
 
-        return img, label, uq_idx, np.array([labeled_or_not])
+        return img, label, text_prompts, uq_idx, np.array([labeled_or_not])
 
     def __len__(self):
         return len(self.unlabelled_dataset) + len(self.labelled_dataset)
