@@ -236,13 +236,13 @@ def test(model, test_loader, epoch, save_name, args):
 
     for batch_idx, (images, label, text_prompts,  _) in enumerate(tqdm(test_loader)):
         images = images.cuda(non_blocking=True)
-        text_prompts = torch.stack(text_prompts, dim=1).cuda()
+        text_prompts = text_prompts.cuda(non_blocking=True)
 
         with torch.no_grad():
             _, logits = model(images, text_prompts)
             preds.append(logits.argmax(1).cpu().numpy())
             targets.append(label.cpu().numpy())
-            mask = np.append(mask, np.array([True if x.item() in range(len(args.train_classes)) else False for x in label]))
+            mask = np.append(mask, [x.item() in args.train_classes for x in label])
 
     preds = np.concatenate(preds)
     targets = np.concatenate(targets)
