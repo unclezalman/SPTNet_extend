@@ -138,6 +138,7 @@ def construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text
     print("Text features shape before mean:", text_feats.shape)
     
     text_feats= text_feats.mean(dim=1)
+    text_feats = text_feats.repeat_interleave(args.n_views, dim=0)
 
     print("Text feats shape after mean:", text_feats.shape)
           
