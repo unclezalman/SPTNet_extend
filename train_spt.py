@@ -361,7 +361,7 @@ if __name__ == "__main__":
     # Sampler which balances labelled and unlabelled examples in each batch
     # --------------------
     label_len = len(datasets['train_labelled'])
-    unlabelled_len = len(datasets['train_unlabelled']
+    unlabelled_len = len(datasets['train_unlabelled'])
     sample_weights = [1 if i < label_len else label_len / unlabelled_len for i in range(len(train_dataset))]
     sample_weights = torch.DoubleTensor(sample_weights)
     sampler = torch.utils.data.WeightedRandomSampler(sample_weights, num_samples=len(train_dataset))
