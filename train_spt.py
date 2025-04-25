@@ -86,7 +86,6 @@ class FusionProjector(nn.Module):
         self.classifier = nn.Linear(out_dim, num_classes)
 
     def forward(self, image_feats, text_feats):
-        text_feats = text_feats.mean(dim=1)
         image_proj = self.image_proj(image_feats)
         text_proj = self.text_proj(text_feats)
         fused = torch.cat([image_proj, text_proj], dim=-1)
