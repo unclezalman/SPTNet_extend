@@ -86,10 +86,16 @@ class FusionProjector(nn.Module):
         self.classifier = nn.Linear(out_dim, num_classes)
 
     def forward(self, image_feats, text_feats):
+        image_feats = image_feats.to(self.image_proj.weight.dtype)
+        text_feats = text_feats.to(self.text_proj.weight.dtype)
+
+        text_feats = text_feats.mean(dim=1)
         image_proj = self.image_proj(image_feats)
         text_proj = self.text_proj(text_feats)
+        
         fused = torch.cat([image_proj, text_proj], dim=-1)
         fused = self.mlp(fused)
+        
         proj = self.proj_head(fused)
         out = self.classifier(proj)
 
@@ -238,7 +244,7 @@ def test(model, test_loader, epoch, save_name, args):
         images = images.cuda(non_blocking=True)
         text_prompts = text_prompts.cuda(non_blocking=True)
 
-        with torch.no_grad():
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=args.fp16):
             _, logits = model(images, text_prompts)
             preds.append(logits.argmax(1).cpu().numpy())
             targets.append(label.cpu().numpy())
