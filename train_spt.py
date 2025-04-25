@@ -71,7 +71,7 @@ device = torch.device('cuda')
 args = get_class_splits(args)
 
 class FusionProjector(nn.Module):
-    def __init__(self, image_feat_dim, text_feat_dim, out_dim, num_classes, num_mlp_layers=3):
+    def __init__(self, image_feat_dim=512, text_feat_dim=512, out_dim=256, num_classes=100, num_mlp_layers=3):
         super().__init__()
         self.image_proj = nn.Linear(image_feat_dim, out_dim)
         self.text_proj = nn.Linear(text_feat_dim, out_dim)
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     args.interpolation = 3
     args.crop_pct = 0.875
     args.image_size = 224
-    args.feat_dim = 768
+    args.feat_dim = 512
     args.proj_dim = 256
     args.num_mlp_layers = 3
     args.num_labeled_classes = len(args.train_classes)
