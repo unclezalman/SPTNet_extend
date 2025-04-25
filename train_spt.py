@@ -205,12 +205,8 @@ def train(prompter, backbone, text_encoder, projector, train_loader, optimizer, 
                 loss, feats, outs = construct_gcd_loss(None, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer_cls.zero_grad()
-
-            if args.fp16_scaler is None:
-                loss.backward()
-                args.fp16_scaler.scale(loss).backward()
-                args.fp16_scaler.step(optimizer_cls)
-                args.fp16_scaler.update()
+            loss.backward()
+            optimizer_cls.step()
 
         else: # train prompter
             unfreeze(prompter)
@@ -222,9 +218,10 @@ def train(prompter, backbone, text_encoder, projector, train_loader, optimizer, 
                 loss, feats, outs = construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args)
 
             optimizer.zero_grad()
-
             if args.fp16_scaler is None:
                 loss.backward()
+                optimizer.step()
+            else:
                 args.fp16_scaler.scale(loss).backward()
                 args.fp16_scaler.step(optimizer)
                 args.fp16_scaler.update()
