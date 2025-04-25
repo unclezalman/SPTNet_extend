@@ -208,9 +208,6 @@ def train(prompter, backbone, text_encoder, projector, train_loader, optimizer, 
 
             if args.fp16_scaler is None:
                 loss.backward()
-                optimizer_cls.step()
-
-            else:
                 args.fp16_scaler.scale(loss).backward()
                 args.fp16_scaler.step(optimizer_cls)
                 args.fp16_scaler.update()
@@ -228,8 +225,6 @@ def train(prompter, backbone, text_encoder, projector, train_loader, optimizer, 
 
             if args.fp16_scaler is None:
                 loss.backward()
-                optimizer.step()
-            else:
                 args.fp16_scaler.scale(loss).backward()
                 args.fp16_scaler.step(optimizer)
                 args.fp16_scaler.update()
