@@ -30,7 +30,7 @@ class TextEncoder(torch.nn.Module):
         original_shape = text_inputs.shape
         if len(original_shape) == 3:
             batch_size, num_prompts, seq_len = original_shape
-            text_inputs = text_inputs.view(-1, seq_len)
+            text_inputs = text_inputs.view(-1, seq_len).to(self.device)
             
         # Get text features
         with torch.no_grad():
