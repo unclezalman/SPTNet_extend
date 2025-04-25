@@ -71,33 +71,57 @@ device = torch.device('cuda')
 args = get_class_splits(args)
 
 class FusionProjector(nn.Module):
-    def __init__(self, image_feat_dim, text_feat_dim, out_dim, num_mlp_layers=3):
+    def __init__(self, image_feat_dim, text_feat_dim, out_dim, num_classes, num_mlp_layers=3):
         super().__init__()
-        # Project both modalities to same dimension
         self.image_proj = nn.Linear(image_feat_dim, out_dim)
         self.text_proj = nn.Linear(text_feat_dim, out_dim)
-        
-        # MLP head
-        layers = [
-            nn.Linear(out_dim * 2, out_dim),
-            nn.ReLU(),
-            nn.Linear(out_dim, num_classes)
-        ]
-        self.classifier = nn.Sequential(*layers)
-        
+
+        layers  = []
+        in_dim = out_dim*2
+        for _ in range(num_mlp_layers-1):
+            layers.append(nn.Linear(in_dim, in_dim))
+            layers.append(nn.ReLU())
+        self.mlp = nn.Sequential(*layers)
+        self.proj_head = nn.Linear(in_dim, out_dim)
+        self.classifier = nn.Linear(out_dim, num_classes)
+
     def forward(self, image_feats, text_feats):
-        # Average text features across prompts
-        text_feats = text_feats.mean(dim=1)  # [batch_size, text_feat_dim]
-        
-        # Project both modalities
+        text_feats = text_feats.mean(dim=1)
         image_proj = self.image_proj(image_feats)
         text_proj = self.text_proj(text_feats)
-        
-        # Concatenate and pass through MLP
         fused = torch.cat([image_proj, text_proj], dim=-1)
-        logits = self.classifier(fused)
-        return logits
+        fused = self.mlp(fused)
+        proj = self.proj_head(fused)
+        out = self.classifier(proj)
 
+        return proj, out
+    
+class SPTNet(nn.Module):
+    def __init__(self, prompter, backbone, text_encoder, projector):
+        super().__init__()
+        self.prompter = prompter
+        self.backbone = backbone
+        self.text_encoder = text_encoder
+        self.projector = projector
+
+    def forward(self, images, text_prompts=None):
+        # Process images
+        prompted_images = self.prompter(images)
+        image_feats = self.backbone.encode_image(prompted_images)
+        
+        if text_prompts is not None:
+            # Process text prompts
+            batch_size, num_templates = text_prompts.shape[:2]
+            text_prompts_flat = text_prompts.view(batch_size * num_templates, -1)
+            text_feats = self.text_encoder(text_prompts_flat)
+            text_feats = text_feats.view(batch_size, num_templates, -1)
+            text_feats = text_feats.mean(dim=1)
+            
+            # Get projections and logits
+            proj, logits = self.projector(image_feats, text_feats)
+            return proj, logits
+        else:
+            return image_feats
 
 def construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args):
 
@@ -206,11 +230,8 @@ def train(prompter, backbone, text_encoder, projector, train_loader, optimizer, 
     exp_lr_scheduler_cls.step()
 
 
-def test(model, text_encoder, test_loader, epoch, save_name, args):
-
+def test(model, test_loader, epoch, save_name, args):
     model.eval()
-    text_encoder.eval()
-
     preds, targets = [], []
     mask = np.array([])
 
@@ -219,8 +240,7 @@ def test(model, text_encoder, test_loader, epoch, save_name, args):
         text_prompts = torch.stack(text_prompts, dim=1).cuda()
 
         with torch.no_grad():
-            text_features = text_encoder(text_prompts)
-            _, logits = model(images)
+            _, logits = model(images, text_prompts)
             preds.append(logits.argmax(1).cpu().numpy())
             targets.append(label.cpu().numpy())
             mask = np.append(mask, np.array([True if x.item() in range(len(args.train_classes)) else False for x in label]))
@@ -286,7 +306,7 @@ if __name__ == "__main__":
     # CLS HEAD
     # ----------------------
     projector = FusionProjector(image_feat_dim=args.feat_dim, text_feat_dim=512, 
-                                out_dim=args.proj_dim, num_mlp_layers=args.num_mlp_layers).to(device)
+                                out_dim=args.proj_dim, num_classes=args.num_ctgs, num_mlp_layers=args.num_mlp_layers).to(device)
     #projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
     
     
@@ -308,7 +328,8 @@ if __name__ == "__main__":
         if 'teacher' in state_dict:
             state_dict = state_dict['teacher']
         classifier.load_state_dict(state_dict, strict=False)
-    model = nn.Sequential(prompter, backbone,projector).to(device)
+
+    model = SPTNet(prompter, backbone,text_encoder, projector).to(device)
 
     # ----------------------
     # OPTIMIZATION
@@ -375,5 +396,5 @@ if __name__ == "__main__":
         if epoch % args.eval_freq == 0:
             with torch.no_grad():
                 # Testing on labelled examples
-                all_acc, old_acc, new_acc = test(model, text_encoder, test_loader_labelled, epoch=epoch, save_name='Train ACC Unlabelled', args=args)
+                all_acc, old_acc, new_acc = test(model, test_loader_labelled, epoch=epoch, save_name='Train ACC Unlabelled', args=args)
                 torch.save(model.state_dict(), os.path.join(args.model_path, 'dinoB16_best_trainul.pt'))
