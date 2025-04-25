@@ -387,6 +387,8 @@ if __name__ == "__main__":
     # ----------------------
     # TRAIN
     # ----------------------
+    test_sample = train_dataset[0]
+    print(f"Sample contains {len(test_sample)} elements")  # Should be 5
 
     for epoch in range(args.epochs):
         print("Epoch: " + str(epoch))
