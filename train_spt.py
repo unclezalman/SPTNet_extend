@@ -134,7 +134,14 @@ def construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text
     batch_size, num_templates = text_prompts.shape[:2]
     text_prompts_flat = text_prompts.view(batch_size*num_templates, -1)
     text_feats = text_encoder(text_prompts_flat).view(batch_size, num_templates, -1)
+
+    print("Image features shape:", image_feats.shape)
+    print("Text features shape before mean:", text_feats.shape)
+    
     text_feats= text_feats.mean(dim=1)
+
+    print("Text feats shape after mean:", text_feats.shape)
+          
     student_proj, student_out = projector(image_feats, text_feats)
     teacher_out = student_out.detach()
 
