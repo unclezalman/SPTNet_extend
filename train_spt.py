@@ -78,13 +78,12 @@ class FusionProjector(nn.Module):
         self.text_proj = nn.Linear(text_feat_dim, out_dim)
         
         # MLP head
-        layers = []
-        in_dim = out_dim * 2  # Concatenated features
-        for _ in range(num_mlp_layers - 1):
-            layers.append(nn.Linear(in_dim, in_dim))
-            layers.append(nn.ReLU())
-        layers.append(nn.Linear(in_dim, out_dim))
-        self.mlp = nn.Sequential(*layers)
+        layers = [
+            nn.Linear(out_dim * 2, out_dim),
+            nn.ReLU(),
+            nn.Linear(out_dim, num_classes)
+        ]
+        self.classifier = nn.Sequential(*layers)
         
     def forward(self, image_feats, text_feats):
         # Average text features across prompts
@@ -96,19 +95,22 @@ class FusionProjector(nn.Module):
         
         # Concatenate and pass through MLP
         fused = torch.cat([image_proj, text_proj], dim=-1)
-        return self.mlp(fused), fused
+        logits = self.classifier(fused)
+        return logits
 
 
 def construct_gcd_loss(prompter, backbone, text_encoder, projector, images, text_prompts, class_labels, mask_lab, cluster_criterion, epoch, args):
-    text_prompts = torch.stack(text_prompts, dim=1).to(images.device)
 
     if prompter is None:
         image_feats = backbone.encode_image(images)
     else:
         image_feats = backbone.encode_image(prompter(images))
 
-    with torch.no_grad():
-        text_feats = text_encoder(text_prompts)
+    text_prompts = text_prompts.to(images.device)
+    batch_size, num_templates = text_prompts.shape[:2]
+    text_prompts_flat = text_prompts.view(batch_size*num_templates, -1)
+    text_feats = text_encoder(text_prompts_flat).view(batch_size, num_templates, -1)
+    text_feats= text_feats.mean(dim=1)
     student_proj, student_out = projector(image_feats, text_feats)
     teacher_out = student_out.detach()
 
@@ -246,7 +248,7 @@ if __name__ == "__main__":
     args.interpolation = 3
     args.crop_pct = 0.875
     args.image_size = 224
-    args.feat_dim = 768
+    args.feat_dim = 512
     args.proj_dim = 256
     args.num_mlp_layers = 3
     args.num_labeled_classes = len(args.train_classes)
