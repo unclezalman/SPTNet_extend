@@ -35,6 +35,7 @@ class TextEncoder(torch.nn.Module):
         # Get text features
         with torch.no_grad():
             text_features = self.clip_model.encode_text(text_inputs)
+            print(f"Text features shape: {text_features.shape}")
             
         # Reshape if needed
         if len(original_shape) == 3:
