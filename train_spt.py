@@ -59,7 +59,7 @@ parser.add_argument('--warmup_teacher_temp', default=0.07, type=float, help='Ini
 parser.add_argument('--teacher_temp', default=0.04, type=float, help='Final value (after linear warmup)of the teacher temperature.')
 parser.add_argument('--warmup_teacher_temp_epochs', default=30, type=int, help='Number of warmup epochs for the teacher temperature.')
 
-parser.add_argument('--fp16', action='store_true', default=False)
+parser.add_argument('--fp16', action='store_true', default=True)
 parser.add_argument('--eval_freq', default=1, type=int)
 
 
