@@ -131,7 +131,7 @@ if __name__ == "__main__":
     model.cuda()
 
     state_dict = torch.load(args.pretrained_model_path, map_location="cpu")
-    model.load_state_dict(state_dict['model_state_dict'])
+    model.load_state_dict(state_dict)
 
     # DATASETS
     train_transform, test_transform = get_transform(args.transform, image_size=args.image_size, args=args)
