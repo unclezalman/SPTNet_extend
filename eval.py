@@ -29,6 +29,8 @@ import clip
 
 parser = argparse.ArgumentParser(description='cluster', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--prop_train_labels', type=float, default=0.5)
+parser.add_argument('--fp16', action='store_true', default=True)
+
 parser.add_argument('--batch_size', default=128, type=int)
 parser.add_argument('--num_workers', default=8, type=int)
 parser.add_argument('--eval_funcs', nargs='+', help='Which eval functions to use', default=['v2', 'v2p'])
