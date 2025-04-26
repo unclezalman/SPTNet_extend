@@ -25,6 +25,7 @@ from config import clip_pretrain_path, dino_pretrain_path
 from models import clip_vit
 from models.text_encoder import TextEncoder
 from train_spt import SPTNet, FusionProjector
+import clip
 
 parser = argparse.ArgumentParser(description='cluster', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch_size', default=128, type=int)
@@ -95,7 +96,9 @@ if __name__ == "__main__":
     # BASE MODEL
     # ----------------------
     #backbone = vits.__dict__['vit_base']().to(device)
-    backbone = clip_vit.load_clip(clip_pretrain_path).to(device)
+
+    clip_model, _ = clip.load("ViT-B/16", device=device)
+    backbone = clip_model.visual
     text_encoder = TextEncoder(args.pretrained_model_path).to(device)
     projector = FusionProjector(
         image_feat_dim=args.feat_dim,
