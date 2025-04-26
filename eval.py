@@ -38,7 +38,7 @@ parser.add_argument('--use_ssb_splits', action='store_true', default=True)
 parser.add_argument('--transform', type=str, default='imagenet')
 parser.add_argument('--prompt_type', type=str, default='all')
 parser.add_argument('--pretrained_model_path', type=str)
-parses.add_argument('--clip_model', type=str, default='ViT-B/16')
+parser.add_argument('--clip_model', type=str, default='ViT-B/16')
 
 # ----------------------
 # INIT
