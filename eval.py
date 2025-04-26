@@ -97,8 +97,8 @@ if __name__ == "__main__":
     # ----------------------
     #backbone = vits.__dict__['vit_base']().to(device)
 
-    clip_model = clip.load(args.clip_model, device=device, jit=False)[0]
-    text_encoder = TextEncoder(args.pretrained_model_path).to(device)
+    backbone = clip_vit.load_clip(clip_pretrain_path).to(device)
+    text_encoder = TextEncoder().to(device)
 
     if args.prompt_type == 'patch':
         args.prompt_size = 1
@@ -118,13 +118,13 @@ if __name__ == "__main__":
     # ----------------------
         
     projector = FusionProjector(
-        image_feat_dim=512,
+        image_feat_dim=768,
         text_feat_dim=512,
         out_dim=args.proj_dim,
         num_classes=args.num_ctgs, 
         num_mlp_layers=args.num_mlp_layers).to(device)
 
-    model = SPTNet(prompter=prompter, backbone=clip_model.visual, text_encoder=text_encoder, projector=projector).to(device)
+    model = SPTNet(prompter=prompter, backbone=backbone, text_encoder=text_encoder, projector=projector).to(device)
     if args.pretrained_model_path.endswith('.pt'):
         state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
         model.load_state_dict(state_dict['model_state_dict'])
