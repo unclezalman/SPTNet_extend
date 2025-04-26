@@ -38,7 +38,7 @@ parser.add_argument('--use_ssb_splits', action='store_true', default=True)
 parser.add_argument('--transform', type=str, default='imagenet')
 parser.add_argument('--prompt_type', type=str, default='all')
 parser.add_argument('--pretrained_model_path', type=str)
-
+parses.add_argument('--clip_model', type=str, default='ViT-B/16')
 
 # ----------------------
 # INIT
@@ -97,15 +97,8 @@ if __name__ == "__main__":
     # ----------------------
     #backbone = vits.__dict__['vit_base']().to(device)
 
-    clip_model, _ = clip.load("ViT-B/16", device=device)
-    backbone = clip_model.visual
+    clip_model = clip.load(args.clip_model, device=device, jit=False)[0]
     text_encoder = TextEncoder(args.pretrained_model_path).to(device)
-    projector = FusionProjector(
-        image_feat_dim=args.feat_dim,
-        text_feat_dim=512,
-        out_dim=args.proj_dim,
-        num_classes=args.num_ctgs, 
-        num_mlp_layers=args.num_mlp_layers).to(device)
 
     if args.prompt_type == 'patch':
         args.prompt_size = 1
@@ -123,18 +116,26 @@ if __name__ == "__main__":
     # ----------------------
     # CLS HEAD
     # ----------------------
-    #projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
-    classifier = nn.Sequential(backbone, projector).cuda()
-    model = SPTNet(prompter, backbone, text_encoder, projector).to(device)
+        
+    projector = FusionProjector(
+        image_feat_dim=512,
+        text_feat_dim=512,
+        out_dim=args.proj_dim,
+        num_classes=args.num_ctgs, 
+        num_mlp_layers=args.num_mlp_layers).to(device)
+
+    model = SPTNet(prompter=prompter, backbone=clip_model.visual, text_encoder=text_encoder, projector=projector).to(device)
+    if args.pretrained_model_path.endswith('.pt'):
+        state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
+        model.load_state_dict(state_dict['model_state_dict'])
+    else:
+        raise ValueError("Invalid pretrained model path")
+                        
 
     for p in model.parameters():
         p.requires_grad = False
 
     model.eval()
-    model.cuda()
-
-    state_dict = torch.load(args.pretrained_model_path, map_location="cpu")
-    model.load_state_dict(state_dict)
 
     # DATASETS
     train_transform, test_transform = get_transform(args.transform, image_size=args.image_size, args=args)
