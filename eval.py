@@ -22,6 +22,9 @@ from model import DINOHead
 
 from config import clip_pretrain_path, dino_pretrain_path
 
+from models import clip_vit
+from models.text_encoder import TextEncoder
+from train_spt import SPTNet, FusionProjector
 
 parser = argparse.ArgumentParser(description='cluster', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--batch_size', default=128, type=int)
@@ -50,10 +53,12 @@ def test(model, test_loader, save_name, args):
 
     preds, targets = [], []
     mask = np.array([])
-    for batch_idx, (images, label, _) in enumerate(tqdm(test_loader)):
+    for batch_idx, (images, label, text_prompts, _) in enumerate(tqdm(test_loader)):
         images = images.cuda(non_blocking=True)
-        with torch.no_grad():
-            _, logits = model(images)
+        text_prompts = text_prompts.cuda(non_blocking=True)
+        
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=args.fp16):
+            _, logits = model(images, text_prompts)
             preds.append(logits.argmax(1).cpu().numpy())
             targets.append(label.cpu().numpy())
             mask = np.append(mask, np.array([True if x.item() in range(len(args.train_classes)) else False for x in label]))
@@ -89,7 +94,15 @@ if __name__ == "__main__":
     # ----------------------
     # BASE MODEL
     # ----------------------
-    backbone = vits.__dict__['vit_base']().to(device)
+    #backbone = vits.__dict__['vit_base']().to(device)
+    backbone = clip_vit.load_clip(clip_pretrain_path).to(device)
+    text_encoder = TextEncoder(args.pretrained_model_path).to(device)
+    projector = FusionProjector(
+        image_feat_dim=args.feat_dim,
+        text_feat_dim=512,
+        out_dim=args.proj_dim,
+        num_classes=args.num_ctgs, 
+        num_mlp_layers=args.num_mlp_layers).to(device)
 
     if args.prompt_type == 'patch':
         args.prompt_size = 1
@@ -107,9 +120,9 @@ if __name__ == "__main__":
     # ----------------------
     # CLS HEAD
     # ----------------------
-    projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
+    #projector = DINOHead(in_dim=args.feat_dim, out_dim=args.num_ctgs, nlayers=args.num_mlp_layers)
     classifier = nn.Sequential(backbone, projector).cuda()
-    model = nn.Sequential(prompter, classifier).cuda()
+    model = SPTNet(prompter, backbone, text_encoder, projector).to(device)
 
     for p in model.parameters():
         p.requires_grad = False
@@ -118,7 +131,7 @@ if __name__ == "__main__":
     model.cuda()
 
     state_dict = torch.load(args.pretrained_model_path, map_location="cpu")
-    model.load_state_dict(state_dict)
+    model.load_state_dict(state_dict['model_state_dict'])
 
     # DATASETS
     train_transform, test_transform = get_transform(args.transform, image_size=args.image_size, args=args)
