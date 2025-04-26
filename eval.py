@@ -127,7 +127,7 @@ if __name__ == "__main__":
     model = SPTNet(prompter=prompter, backbone=backbone, text_encoder=text_encoder, projector=projector).to(device)
     if args.pretrained_model_path.endswith('.pt'):
         state_dict = torch.load(args.pretrained_model_path, map_location='cpu')
-        model.load_state_dict(state_dict['model_state_dict'])
+        model.load_state_dict(state_dict)
     else:
         raise ValueError("Invalid pretrained model path")
                         
