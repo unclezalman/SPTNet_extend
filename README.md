@@ -17,30 +17,27 @@
 
 ![teaser](assets/teaser.png)
 
-## Update
+## Extension
 
-[05.2024] We update the results of SPTNet with DINOv2 on CUB, please check our latest version in [Arxiv](https://arxiv.org/abs/2403.13684) 
-
-|               | All  | Old  | New  |
-|---------------|------|------|------|
-| CUB (DINO)           | 65.8 | 68.8 | 65.1 |
-| CUB (DINOv2)         | 76.3 | 79.5 | 74.6 |
+This is the extended version of SPTNet created for the APAI3010_STAT3010 group project, by group 9. The extensions include adding the ability to run the model on the Food-101 dataset, as well as a multimodal version of SPTNet that integrates fixed text prompts with visual prompts that can be run on the CIFAR-100 dataset. 
 
 ## Prerequisite 🛠️
 
 First, you need to clone the SPTNet repository from GitHub. Open your terminal and run the following command:
 
 ```
-git clone https://github.com/Visual-AI/SPTNet.git
-cd SPTNet
+git clone https://github.com/Visual-AI/SPTNet.git](https://github.com/unclezalman/SPTNet_extend.git
+cd SPTNet_extend
 ```
 
-We recommend setting up a conda environment for the project:
+We recommend setting up a conda environment for the project. You will also need to download a CLIP backbone if using the extended model:
 
 ```bash
-conda create --name=spt python=3.9
-conda activate spt
+conda create -n spt_extend
+conda activate spt_extend
 pip install -r requirements.txt
+pip install torch==2.0.0 torchvision==0.15.1 torchaudio==2.0.1
+pip install git+https://github.com/openai/CLIP.git
 ```
 
 ## Running 🏃
@@ -51,45 +48,31 @@ Set paths to datasets and desired log directories in ```config.py```
 
 ### Datasets
 
-We use generic object recognition datasets, including CIFAR-10/100 and ImageNet-100/1K:
+Generic object recognition datasets, including CIFAR-10/100 and ImageNet-100/1K:
 
 * [CIFAR-10/100](https://pytorch.org/vision/stable/datasets.html) and [ImageNet-100/1K](https://image-net.org/download.php)
 
-We also use fine-grained benchmarks (CUB, Stanford-cars, FGVC-aircraft, Herbarium-19). You can find the datasets in:
+Fine-grained benchmarks (CUB, Stanford-cars, FGVC-aircraft, Herbarium-19, Food-101). You can find the datasets in:
 
-* [The Semantic Shift Benchmark (SSB)](https://github.com/sgvaze/osr_closed_set_all_you_need#ssb) and [Herbarium19](https://www.kaggle.com/c/herbarium-2019-fgvc6)
+* [The Semantic Shift Benchmark (SSB)](https://github.com/sgvaze/osr_closed_set_all_you_need#ssb) and [Herbarium19](https://www.kaggle.com/c/herbarium-2019-fgvc6) and [Food-101](https://www.kaggle.com/datasets/dansbecker/food-101)
 
-### Checkpoints
-Download the checkpints of **SPTNet** for different datasets and put them in the ``checkpoints'' folder (**only used during evaluation**).
-* [Google Drive](https://drive.google.com/drive/folders/16O0QvsCuVb9Xd-UJNx3J3n6WVH6B_IHw?usp=drive_link)
 
 ### Scripts
 
-**Eval the model**
-```
-CUDA_VISIBLE_DEVICES=0 python eval.py \
-    --dataset_name 'aircraft' \
-    --pretrained_model_path ./checkpoints/fgvc/dinoB16_best.pt \
-    --prompt_type 'all' \ # switch to 'patch' for 'cifar10' and 'cifar100'
-    --eval_funcs 'v2' \
-```
-To reproduce all main results in the paper, just change the name (``dataset_name``) and its corresponding path (``pretrained_model_path``) to the pretrained model you downloaded from the above link.
-
-**Train the model**:
+**Train the model(original)**:
 
 ```
 CUDA_VISIBLE_DEVICES=0 python train_spt.py \
-    --dataset_name 'aircraft' \
+    --dataset_name 'food-101' \
     --batch_size 128 \
     --grad_from_block 11 \
     --epochs 1000 \
     --num_workers 8 \
-    --use_ssb_splits \
     --sup_weight 0.35 \
     --weight_decay 5e-4 \
     --transform 'imagenet' \
-    --lr 1 \
-    --lr2 0.05 \
+    --lr 0.5 \
+    --lr2 1e-2 \
     --prompt_size 1 \
     --freq_rep_learn 20 \
     --pretrained_model_path ${YOUR_OWN_PRETRAINED_PATH} \
@@ -101,10 +84,59 @@ CUDA_VISIBLE_DEVICES=0 python train_spt.py \
     --memax_weight 1 \
     --model_path ${YOUR_OWN_SAVE_DIR}
 ```
-Just be aware to change the name (``dataset_name``) and its corresponding path (``pretrained_model_path``) to the pretrained model. Our SPTNet method is adaptable to various pretrained models, allowing for the modification of the architecture by changing the ``pretrained_model_path``. This feature enables quick adoption of the state-of-the-art (SOTA) method. Our default settings utilize the SimGCD method.
+
+**Eval the model(original)**
+```
+CUDA_VISIBLE_DEVICES=0 python eval.py \
+    --dataset_name 'food-101' \
+    --pretrained_model_path ./checkpoints/fgvc/dinoB16_best.pt \
+    --prompt_type 'all' \ # switch to 'patch' for 'cifar10' and 'cifar100'
+    --eval_funcs 'v2' \
+```
+
+**Train the model(extended)**:
+
+```
+CUDA_VISIBLE_DEVICES=0 python train_spt_extend.py \
+    --dataset_name 'cifar100' \
+    --batch_size 128 \
+    --grad_from_block 11 \
+    --epochs 1000 \
+    --num_workers 8 \
+    --use_ssb_splits \
+    --sup_weight 0.35 \
+    --weight_decay 5e-4 \
+    --transform 'imagenet' \
+    --lr 5.0 \
+    --lr2 3e-3 \
+    --prompt_size 1 \
+    --freq_rep_learn 20 \
+    --pretrained_model_path './pretrained_models/clip/ViT-B-16.pt' \
+    --prompt_type 'patch' \
+    --eval_funcs 'v2' \
+    --warmup_teacher_temp 0.07 \
+    --teacher_temp 0.04 \
+    --warmup_teacher_temp_epochs 10 \
+    --memax_weight 1 \
+    --model_path ${YOUR_OWN_SAVE_DIR}\
+    --model 'clip'
+```
+
+**Eval the model(extended)**
+```
+CUDA_VISIBLE_DEVICES=0 python eval.py \
+    --dataset_name 'cifar-100' \
+    --pretrained_model_path ./checkpoints/dinoB16_best.pt \
+    --prompt_type 'patch' \ 
+    --eval_funcs 'v2' \
+```
+
+To reproduce the results in the project for Food-101, the model will have to be trained from scratch. The backbone model used for the results given can be found [here](https://dl.fbaipublicfiles.com/dino/dino_vitbase16_pretrain/dino_vitbase16_pretrain.pth) 
+
+Please note that the extended model can only be used for CIFAR-100 but could be edited further to be used on the other datasets from the original paper. 
 
 ## Hyper-parameters
-If you would like to strictly reproduce the results in our paper (or even better), please use these configurations. Don't worry, only significant divergence will lead to a performance gap:). 
+These are the results and hyperparameters used for the original SPTNet, with no text prompt extension:
 |              | lr1  | lr2  |memax|
 |--------------|------|------|------
 | CIFAR-10     | 1    | 3e-3 | 1   |
@@ -114,7 +146,7 @@ If you would like to strictly reproduce the results in our paper (or even better
 | SCARS        | 10   | 5e-2 | 1   |
 | Aircraft     | 1    | 5e-2 | 1   |
 | Herbarium19  | 0.5  | 1e-2 | 1   |
-
+| Food-101     | 0.5  | 1e-2 | 1   |
 
 
 ## Results
@@ -133,17 +165,16 @@ Fine-grained results:
 | FGVC-Aircraft | 59.3 | 61.8 | 58.1 |
 | Herbarium19   | 43.4 | 58.7 | 35.2 |
 
+New dataset results: 
+|               | All  | Old  | New  |
+|---------------|------|------|------|
+| Food-101      | 66.0 | 89.7 | 40.0 |
 
+Please note that for the results for Food-101 shown here, the model was trained for 50 epochs, with 5 warmup teacher temp epochs. All other parameters were the same as in the example script given.
 
-## Citing this work
-<span id="jump"></span>
-If you find this repo useful for your research, please consider citing our paper:
+## Extension results
+|               | All  | Old  | New  |
+|---------------|------|------|------|
+| CIFAR-100     | 74.0 | 82.6 | 56.7 |
 
-```
-@inproceedings{wang2024sptnet,
-    author    = {Wang, Hongjun and Vaze, Sagar and Han, Kai},
-    title     = {SPTNet: An Efficient Alternative Framework for Generalized Category Discovery with Spatial Prompt Tuning},
-    booktitle = {International Conference on Learning Representations (ICLR)},
-    year      = {2024}
-}
-```
+Please note that for the results shown for the extended SPTNet here, the model was trained for 50 epochs, with 5 warmup teacher epochs. All other parameters were the same as in the example script given, using train_spt_extend.py 
