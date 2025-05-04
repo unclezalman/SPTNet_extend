@@ -13,6 +13,7 @@ from data.imagenet import get_imagenet_100_datasets, get_imagenet_1k_datasets
 from data.stanford_cars import get_scars_datasets
 from data.cub import get_cub_datasets
 from data.fgvc_aircraft import get_aircraft_datasets
+from data.food101 import get_food101_datasets
 
 from copy import deepcopy
 import pickle
@@ -22,6 +23,7 @@ from config import osr_split_dir
 
 
 get_dataset_funcs = {
+    'food101': get_food101_datasets,
     'cifar10': get_cifar_10_datasets,
     'cifar100': get_cifar_100_datasets,
     'imagenet_100': get_imagenet_100_datasets,
@@ -34,6 +36,13 @@ get_dataset_funcs = {
 
 
 def get_datasets(dataset_name, train_transform, test_transform, args):
+    
+    """
+    :return: train_dataset: MergedDataset which concatenates labelled and unlabelled
+             test_dataset,
+             unlabelled_train_examples_test,
+             datasets
+    """
 
     #
     if dataset_name not in get_dataset_funcs.keys():
@@ -148,6 +157,11 @@ def get_class_splits(args):
 
             args.train_classes = range(50)
             args.unlabeled_classes = range(50, 100)
+
+    elif args.dataset_name =='food101':
+        args.image_size = 224
+        args.train_classes = range(50)
+        args.unlabeled_classes = range(50, 101)
 
     elif args.dataset_name == 'cub':
 
