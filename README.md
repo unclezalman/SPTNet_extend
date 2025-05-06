@@ -59,7 +59,7 @@ Fine-grained benchmarks (CUB, Stanford-cars, FGVC-aircraft, Herbarium-19, Food-1
 
 ### Scripts
 
-**Train the model(original)**:
+**Train the model (original)**:
 
 ```
 CUDA_VISIBLE_DEVICES=0 python train_spt.py \
@@ -85,7 +85,7 @@ CUDA_VISIBLE_DEVICES=0 python train_spt.py \
     --model_path ${YOUR_OWN_SAVE_DIR}
 ```
 
-**Eval the model(original)**
+**Eval the model (original):**
 ```
 CUDA_VISIBLE_DEVICES=0 python eval.py \
     --dataset_name 'food-101' \
@@ -94,7 +94,7 @@ CUDA_VISIBLE_DEVICES=0 python eval.py \
     --eval_funcs 'v2' \
 ```
 
-**Train the model(extended)**:
+**Train the model (extended):**:
 
 ```
 CUDA_VISIBLE_DEVICES=0 python train_spt_extend.py \
@@ -122,7 +122,7 @@ CUDA_VISIBLE_DEVICES=0 python train_spt_extend.py \
     --model 'clip'
 ```
 
-**Eval the model(extended)**
+**Eval the model (extended):**
 ```
 CUDA_VISIBLE_DEVICES=0 python eval.py \
     --dataset_name 'cifar-100' \
